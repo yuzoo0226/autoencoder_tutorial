@@ -462,8 +462,8 @@ if __name__ == "__main__":
     if args.base_model.lower() == "vae":
         utils = VAEUtils(args)
         utils.set_random_seed(42)
-        utils.train(num_epochs=args.num_epochs, checkpoint_path=args.checkpoint_path)
-        # utils.test_mnist()
+        # utils.train(num_epochs=args.num_epochs, checkpoint_path=args.checkpoint_path)
+        utils.test_mnist()
 
     elif args.base_model.lower() == "cvae":
         utils = CVAEUtils(args)
