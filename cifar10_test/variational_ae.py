@@ -62,6 +62,7 @@ class VAE(nn.Module):
 
 
 criterion = nn.MSELoss()
+# ce_loss = nn.CrossEntropyLoss(reduction='mean')
 ce_loss = nn.CrossEntropyLoss(reduction='sum')
 
 
