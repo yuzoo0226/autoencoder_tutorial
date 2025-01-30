@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 import matplotlib.pyplot as plt
 
 
@@ -36,10 +36,10 @@ class VAE(nn.Module):
         # Decoder
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),  # (64, 4, 4) → (32, 8, 8)
-            nn.BatchNorm2d(32),
+            # nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),  # (32, 8, 8) → (16, 16, 16)
-            nn.BatchNorm2d(16),
+            # nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.ConvTranspose2d(16, 3, kernel_size=3, stride=2, padding=1, output_padding=1),  # (16, 16, 16) → (3, 32, 32)
             # nn.BatchNorm2d(3),
@@ -93,7 +93,7 @@ def get_hidden_dim(model, data_loder, device="cuda"):
         return z, labels
 
 
-def main():
+def main(model_path: str, visualize=False, class_label=-1) -> None:
     # デバイス設定
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -106,10 +106,16 @@ def main():
     dataset = datasets.CIFAR10(root="./data", train=True, download=True, transform=transform)
     dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
 
+    # クラスラベル1のデータのみを抽出
+    if class_label != -1:
+        filtered_indices = [i for i, (_, label) in enumerate(dataset) if label == class_label]
+        filtered_dataset = Subset(dataset, filtered_indices)
+        dataloader = DataLoader(filtered_dataset, batch_size=64, shuffle=True)
+
     # モデルの準備
     model = VAE().to(device)
     # criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
     # 学習ループ
     epochs = 10000
@@ -129,54 +135,52 @@ def main():
 
         print(f"Epoch [{epoch}/{epochs}], Loss: {(loss.item()/len(images)):.4f}")
 
-        if epoch % 10 == 0:
+        if epoch % 200 == 0:
             # # 結果の可視化
-            # model.eval()
-            # dataiter = iter(dataloader)
-            # images, _ = next(dataiter)
-            # images = images.to(device)
-            # # print("============= inputs ===============")
-            # # print(images)
+            if visualize:
+                model.eval()
+                dataiter = iter(dataloader)
+                images, _ = next(dataiter)
+                images = images.to(device)
 
-            # with torch.no_grad():
-            #     outputs, z, mu, logvar = model(images)
-            #     # print("============== outputs ============")
-            #     # print(outputs)
+                with torch.no_grad():
+                    outputs, z, mu, logvar = model(images)
 
-            # # 可視化
-            # fig, axes = plt.subplots(2, 6, figsize=(10, 4))
-            # for i in range(6):
-            #     axes[0, i].imshow(images[i].cpu().permute(1, 2, 0))
-            #     axes[0, i].axis("off")
+                # 可視化
+                fig, axes = plt.subplots(2, 6, figsize=(10, 4))
+                for i in range(6):
+                    axes[0, i].imshow(images[i].cpu().permute(1, 2, 0))
+                    axes[0, i].axis("off")
 
-            #     axes[1, i].imshow(outputs[i].cpu().permute(1, 2, 0))
-            #     axes[1, i].axis("off")
-            # plt.show()
+                    axes[1, i].imshow(outputs[i].cpu().permute(1, 2, 0))
+                    axes[1, i].axis("off")
+                plt.show()
 
-            # z, labels = get_hidden_dim(model, dataloader)
+                # 潜在空間の可視化
+                # z, labels = get_hidden_dim(model, dataloader)
 
-            # z_np = z.to('cpu').detach().numpy()
-            # labels_np = labels.to('cpu').detach().numpy()
+                # z_np = z.to('cpu').detach().numpy()
+                # labels_np = labels.to('cpu').detach().numpy()
 
-            # cmap_keyword = "tab10"
-            # cmap = plt.get_cmap(cmap_keyword)
+                # cmap_keyword = "tab10"
+                # cmap = plt.get_cmap(cmap_keyword)
 
-            # plt.figure(figsize=[10, 10])
-            # for label in range(10):
-            #     x = []
-            #     y = []
-            #     for idx, estimate_label in enumerate(labels_np):
-            #         if estimate_label == label:
-            #             x.append(z_np[idx][0])
-            #             y.append(z_np[idx][1])
-            #     plt.scatter(x, y, color=cmap(label/9), label=label, s=15)
-            #     plt.annotate(label, xy=(np.mean(x), np.mean(y)), size=20, color="black")
-            # plt.legend(loc="upper left")
-            # plt.show()
+                # plt.figure(figsize=[10, 10])
+                # for label in range(10):
+                #     x = []
+                #     y = []
+                #     for idx, estimate_label in enumerate(labels_np):
+                #         if estimate_label == label:
+                #             x.append(z_np[idx][0])
+                #             y.append(z_np[idx][1])
+                #     plt.scatter(x, y, color=cmap(label/9), label=label, s=15)
+                #     plt.annotate(label, xy=(np.mean(x), np.mean(y)), size=20, color="black")
+                # plt.legend(loc="upper left")
+                # plt.show(block=False)
 
             # モデルの保存
-            torch.save(model.state_dict(), "vae_model.pth")
-            print("Model saved as vae_model.pth")
+            torch.save(model.state_dict(), model_path)
+            print(f"Model saved as {model_path}")
 
             model.train()
 
@@ -228,11 +232,13 @@ def load_and_infer(model_path, sample_images=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--inference", "-i", action="store_true")
+    parser.add_argument("--visualize", "-v", action="store_false")
     parser.add_argument("--model_path", "-m", default="vae_model.pth")
+    parser.add_argument("--class_label", "-c", type=int, default=-1)
     args = parser.parse_args()
 
     if args.inference:
         sample_images = load_images()
         load_and_infer(model_path=args.model_path, sample_images=sample_images)
     else:
-        main()
+        main(args.model_path, args.visualize, class_label=args.class_label)
