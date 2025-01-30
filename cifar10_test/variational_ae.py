@@ -1,4 +1,6 @@
+import argparse
 import numpy as np
+
 
 import torch
 import torch.nn as nn
@@ -27,8 +29,8 @@ class VAE(nn.Module):
             nn.ReLU()
         )
 
-        self.fc_mu = nn.Linear(64 * 4 * 4, 512)  # 2次元潜在空間
-        self.fc_logvar = nn.Linear(64 * 4 * 4, 512)  # 2次元潜在空間
+        self.fc_mu = nn.Linear(64 * 4 * 4, 512)
+        self.fc_logvar = nn.Linear(64 * 4 * 4, 512)
         self.fc_decode = nn.Linear(512, 64 * 4 * 4)
 
         # Decoder
@@ -179,5 +181,58 @@ def main():
             model.train()
 
 
+def load_images():
+    """CIFAR-10 のロード
+
+    Returns:
+        _type_: _description_
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    transform = transforms.Compose([
+        transforms.Resize((32, 32)),
+        transforms.ToTensor()
+    ])
+    dataset = datasets.CIFAR10(root="./data", train=True, download=True, transform=transform)
+    dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+    # 結果の可視化
+    dataiter = iter(dataloader)
+    images, _ = next(dataiter)
+    images = images.to(device)
+
+    return images
+
+
+# モデルの読み込みと推論
+def load_and_infer(model_path, sample_images=None):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = VAE().to(device)
+    model.load_state_dict(torch.load(model_path))
+    model.eval()
+    with torch.no_grad():
+        outputs, z, _, _ = model(sample_images.to(device))
+
+    # 可視化
+    fig, axes = plt.subplots(2, 6, figsize=(10, 4))
+    for i in range(6):
+        axes[0, i].imshow(sample_images[i].cpu().permute(1, 2, 0))
+        axes[0, i].axis("off")
+
+        axes[1, i].imshow(outputs[i].cpu().permute(1, 2, 0))
+        axes[1, i].axis("off")
+    plt.show()
+
+    return outputs
+
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--inference", "-i", action="store_true")
+    parser.add_argument("--model_path", "-m", default="vae_model.pth")
+    args = parser.parse_args()
+
+    if args.inference:
+        sample_images = load_images()
+        load_and_infer(model_path=args.model_path, sample_images=sample_images)
+    else:
+        main()
