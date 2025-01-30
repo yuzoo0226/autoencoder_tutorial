@@ -93,5 +93,35 @@ def main():
     plt.show()
 
 
+def load_and_infer(model_path: str, sample_images: torch.Tensor) -> torch.Tensor:
+    """モデルの読み込みと推論
+
+    Args:
+        model_path (str): modelのパス
+        sample_images (torch.Tensor): images.
+
+    Returns:
+        torch.Tensor: decode結果
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = AutoEncoder().to(device)
+    model.load_state_dict(torch.load(model_path))
+    model.eval()
+    with torch.no_grad():
+        outputs = model(sample_images.to(device))
+
+    # 可視化
+    fig, axes = plt.subplots(2, 6, figsize=(10, 4))
+    for i in range(6):
+        axes[0, i].imshow(sample_images[i].cpu().permute(1, 2, 0))
+        axes[0, i].axis("off")
+
+        axes[1, i].imshow(outputs[i].cpu().permute(1, 2, 0))
+        axes[1, i].axis("off")
+    plt.show()
+
+    return outputs
+
+
 if __name__ == "__main__":
     main()
