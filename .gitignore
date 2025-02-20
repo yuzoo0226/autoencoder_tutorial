@@ -1,4 +1,5 @@
 model/**.pt
+loss/data/*
 !model/cvae_epoch_600.pt
 test.png
 
